@@ -1,6 +1,9 @@
 ﻿using System;
 using Unity.Robotics;
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Unity.Robotics.UrdfImporter.Control
 {
@@ -59,8 +62,8 @@ namespace Unity.Robotics.UrdfImporter.Control
 
         void Update()
         {
-            bool SelectionInput1 = Input.GetKeyDown("right");
-            bool SelectionInput2 = Input.GetKeyDown("left");
+            bool SelectionInput1 = IsRightSelectionPressed();
+            bool SelectionInput2 = IsLeftSelectionPressed();
 
             SetSelectedJointIndex(selectedIndex); // to make sure it is in the valid range
             UpdateDirection(selectedIndex);
@@ -126,7 +129,7 @@ namespace Unity.Robotics.UrdfImporter.Control
                 return;
             }
 
-            float moveDirection = Input.GetAxis("Vertical");
+            float moveDirection = GetVerticalInput();
             JointControl current = articulationChain[jointIndex].GetComponent<JointControl>();
             if (previousIndex != jointIndex)
             {
@@ -152,6 +155,49 @@ namespace Unity.Robotics.UrdfImporter.Control
             {
                 current.direction = RotationDirection.None;
             }
+        }
+
+        private static bool IsRightSelectionPressed()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Keyboard.current?.rightArrowKey.wasPressedThisFrame ?? false;
+#else
+            return Input.GetKeyDown("right");
+#endif
+        }
+
+        private static bool IsLeftSelectionPressed()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Keyboard.current?.leftArrowKey.wasPressedThisFrame ?? false;
+#else
+            return Input.GetKeyDown("left");
+#endif
+        }
+
+        private static float GetVerticalInput()
+        {
+#if ENABLE_INPUT_SYSTEM
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+            {
+                return 0;
+            }
+
+            float direction = 0;
+            if (keyboard.upArrowKey.isPressed || keyboard.wKey.isPressed)
+            {
+                direction += 1;
+            }
+            if (keyboard.downArrowKey.isPressed || keyboard.sKey.isPressed)
+            {
+                direction -= 1;
+            }
+
+            return Mathf.Clamp(direction, -1, 1);
+#else
+            return Input.GetAxis("Vertical");
+#endif
         }
 
         /// <summary>

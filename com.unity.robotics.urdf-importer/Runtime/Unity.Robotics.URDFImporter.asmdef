@@ -8,6 +8,7 @@
     "includePlatforms": [
         "Android",
         "Editor",
+        "VisionOS",
         "LinuxStandalone64",
         "macOSStandalone",
         "WindowsStandalone64"

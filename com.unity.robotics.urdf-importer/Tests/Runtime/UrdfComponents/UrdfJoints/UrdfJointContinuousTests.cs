@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using Unity.Robotics.UrdfImporter;
 using UnityEngine;
 using Joint = Unity.Robotics.UrdfImporter.Joint;
@@ -74,7 +74,10 @@ namespace Unity.Robotics.UrdfImporter.Tests
 
             Assert.AreEqual(0, articulationBody.xDrive.target);
             joint.UpdateJointState(1);
-            Assert.AreEqual(1, articulationBody.xDrive.target);
+            // deltaState is radians, xDrive.target is degrees. This previously asserted the
+            // unconverted value, which is what made continuous joints move ~57x too little
+            // and disagree with the identical revolute test.
+            Assert.AreEqual(1 * Mathf.Rad2Deg, articulationBody.xDrive.target);
 
             Object.DestroyImmediate(baseObject);
         }

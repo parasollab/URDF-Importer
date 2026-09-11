@@ -168,11 +168,8 @@ namespace Unity.Robotics.UrdfImporter
 
         protected override void AdjustMovement(Joint joint)
         {
-            if (joint.axis == null || joint.axis.xyz == null)
-            {
-                joint.axis = new Joint.Axis(new double[] { 1, 0, 0 });
-            }
-            axisofMotion = new Vector3((float)joint.axis.xyz[0], (float)joint.axis.xyz[1], (float)joint.axis.xyz[2]);
+            axisofMotion = ResolveAxis(joint);
+            joint.axis = new Joint.Axis(new double[] { axisofMotion.x, axisofMotion.y, axisofMotion.z });
             int motionAxis = joint.axis.AxisofMotion();
             Quaternion motion = unityJoint.anchorRotation;
 
@@ -185,14 +182,14 @@ namespace Unity.Robotics.UrdfImporter
                 {
                     stiffness = unityJoint.xDrive.stiffness,
                     damping = unityJoint.xDrive.damping,
-                    forceLimit = (float)joint.limit.effort,
-                    lowerLimit = (float)joint.limit.lower,
-                    upperLimit = (float)joint.limit.upper,
+                    forceLimit = ResolveEffort(joint.limit),
+                    lowerLimit = ResolveBound(joint.limit.lower, -UnboundedLinearLimit),
+                    upperLimit = ResolveBound(joint.limit.upper, UnboundedLinearLimit),
                 };
                 unityJoint.xDrive = drive;
                 unityJoint.zDrive = drive;
                 unityJoint.yDrive = drive;
-                unityJoint.maxLinearVelocity = (float)joint.limit.velocity;
+                unityJoint.maxLinearVelocity = ResolveVelocity(joint.limit);
             }
             else
             {

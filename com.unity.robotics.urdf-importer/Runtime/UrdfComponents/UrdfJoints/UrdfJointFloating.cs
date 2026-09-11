@@ -24,8 +24,11 @@ namespace Unity.Robotics.UrdfImporter
         {
             UrdfJointFloating urdfJoint = linkObject.AddComponent<UrdfJointFloating>();
             #if UNITY_2020_1_OR_NEWER
-                urdfJoint.unityJoint = linkObject.AddComponent<ArticulationBody>();
-                //Doesnt have any equivalent Articulatiob Joint
+                // A 6-DOF joint has no ArticulationJointType equivalent. The body is simply
+                // left unconstrained relative to its parent - which is what a floating joint
+                // means. Note this used to AddComponent a *second* ArticulationBody on a
+                // GameObject that [RequireComponent] had already given one.
+                urdfJoint.unityJoint = linkObject.GetComponent<ArticulationBody>();
             #else
             urdfJoint.UnityJoint = linkObject.AddComponent<ConfigurableJoint>();
             #endif

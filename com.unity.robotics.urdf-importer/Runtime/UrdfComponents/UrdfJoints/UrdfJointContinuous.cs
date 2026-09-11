@@ -83,12 +83,27 @@ namespace Unity.Robotics.UrdfImporter
         {
 
 #if UNITY_2020_1_OR_NEWER
+            // deltaState is in radians, xDrive.target is in degrees.
             ArticulationDrive drive = unityJoint.xDrive;
-            drive.target += deltaState;
+            drive.target += deltaState * Mathf.Rad2Deg;
             unityJoint.xDrive = drive;
 #else
             Quaternion rot = Quaternion.AngleAxis(-deltaState * Mathf.Rad2Deg, unityJoint.axis);
             transform.rotation = transform.rotation * rot;
+#endif
+        }
+
+        /// <summary>
+        /// Drives the joint to an absolute angle in radians.
+        /// </summary>
+        protected override void OnSetPosition(float position)
+        {
+#if UNITY_2020_1_OR_NEWER
+            ArticulationDrive drive = unityJoint.xDrive;
+            drive.target = position * Mathf.Rad2Deg;
+            unityJoint.xDrive = drive;
+#else
+            transform.localRotation = Quaternion.AngleAxis(-position * Mathf.Rad2Deg, unityJoint.axis);
 #endif
         }
 
@@ -123,7 +138,7 @@ namespace Unity.Robotics.UrdfImporter
         /// <param name="joint">Structure containing joint information</param>
         protected override void AdjustMovement(Joint joint)
         {
-            axisofMotion = joint.axis.xyz.ToVector3();
+            axisofMotion = ResolveAxis(joint);
             unityJoint.linearLockX = ArticulationDofLock.LockedMotion;
             unityJoint.linearLockY = ArticulationDofLock.LockedMotion;
             unityJoint.linearLockZ = ArticulationDofLock.LockedMotion;
@@ -134,15 +149,14 @@ namespace Unity.Robotics.UrdfImporter
             motion.SetFromToRotation(new Vector3(1, 0, 0), -1 * axisofMotionUnity);
             unityJoint.anchorRotation = motion;
 
-            if (joint.limit != null)
-            {
-                ArticulationDrive drive = unityJoint.xDrive;
-                drive.forceLimit = (float)(joint.limit.effort);
-                unityJoint.maxAngularVelocity = (float)(joint.limit.velocity);
-                drive.damping = unityJoint.xDrive.damping;
-                drive.stiffness = unityJoint.xDrive.stiffness;
-                unityJoint.xDrive = drive;
-            }
+            // A continuous joint legitimately carries no <limit>, so the drive is set up
+            // unconditionally - the resolvers supply the import defaults when it is absent.
+            ArticulationDrive drive = unityJoint.xDrive;
+            drive.forceLimit = ResolveEffort(joint.limit);
+            unityJoint.maxAngularVelocity = ResolveVelocity(joint.limit);
+            drive.damping = unityJoint.xDrive.damping;
+            drive.stiffness = unityJoint.xDrive.stiffness;
+            unityJoint.xDrive = drive;
         }
 
     }

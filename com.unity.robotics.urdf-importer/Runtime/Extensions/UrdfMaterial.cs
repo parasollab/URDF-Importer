@@ -32,7 +32,10 @@ namespace Unity.Robotics.UrdfImporter
         #region Import
         private static Material CreateMaterial(this Link.Visual.Material urdfMaterial)
         {
-            if (urdfMaterial.name == "")
+            // Exporters routinely emit <material name=""> on every visual, and the name
+            // attribute is optional outright. Both land here and get a name derived from the
+            // material's own colour or texture, which keeps distinct materials distinct.
+            if (string.IsNullOrEmpty(urdfMaterial.name))
             {
                 urdfMaterial.name = GenerateMaterialName(urdfMaterial);
             }
@@ -116,7 +119,7 @@ namespace Unity.Robotics.UrdfImporter
 
         private static Texture LoadTexture(string filename)
         {
-            return filename == "" ? null : LocateAssetHandler.FindUrdfAsset<Texture>(filename);
+            return string.IsNullOrEmpty(filename) ? null : LocateAssetHandler.FindUrdfAsset<Texture>(filename);
         }
 
 

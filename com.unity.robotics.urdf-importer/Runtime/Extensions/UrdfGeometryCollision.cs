@@ -88,11 +88,16 @@ namespace Unity.Robotics.UrdfImporter
         {
             string meshFilePath = UrdfAssetPathHandler.GetRelativeAssetPathFromUrdfPath(mesh.filename, false);
             GameObject meshObject = null;
-            if (meshFilePath.ToLower().EndsWith(".stl"))
+            try
             {
-                meshObject = StlAssetPostProcessor.CreateStlGameObjectRuntime(meshFilePath);
+                meshObject = LoadMeshRuntime(meshFilePath);
             }
-            else
+            catch (System.Exception ex)
+            {
+                Debug.LogAssertion(ex);
+            }
+
+            if (meshObject == null)
             {
                 Debug.LogError("Unable to create mesh collider for the mesh: " + mesh.filename);
             }

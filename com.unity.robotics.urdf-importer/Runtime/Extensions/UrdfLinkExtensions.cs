@@ -43,24 +43,22 @@ namespace Unity.Robotics.UrdfImporter
 
         private static void ImportLinkData(this UrdfLink urdfLink, Link link, Joint joint)
         {
-            if (link.inertial == null && joint == null)
-            {
-                urdfLink.IsBaseLink = true;
-            }
+            // The root is the link reached with no joint above it. Tagging it only when it
+            // *also* lacked <inertial> meant a root that declares mass was never marked as
+            // the base link, which in turn made export emit a spurious fixed joint for it.
+            urdfLink.IsBaseLink = joint == null;
+
             urdfLink.gameObject.name = link.name;
             if (joint?.origin != null)
                 UrdfOrigin.ImportOriginData(urdfLink.transform, joint.origin);
 
-            if (link.inertial != null)
-            {
-                UrdfInertial.Create(urdfLink.gameObject, link.inertial);
+            // Every link gets an ArticulationBody, a root with no <inertial> included.
+            // Previously that case created no body at all, so each first-level child became
+            // its own articulation root and the robot imported as several loose pieces.
+            UrdfInertial.Create(urdfLink.gameObject, link.inertial);
 
-                if (joint != null)
-                    UrdfJoint.Create(urdfLink.gameObject, UrdfJoint.GetJointType(joint.type), joint);
-            }
-            else if (joint != null)
+            if (joint != null)
                 UrdfJoint.Create(urdfLink.gameObject, UrdfJoint.GetJointType(joint.type), joint);
-
         } 
         
         public static Link ExportLinkData(this UrdfLink urdfLink)

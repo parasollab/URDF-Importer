@@ -77,23 +77,7 @@ namespace Unity.Robotics.UrdfImporter
                 try 
                 {
                     string meshFilePath = UrdfAssetPathHandler.GetRelativeAssetPathFromUrdfPath(mesh.filename, false);
-                    if (meshFilePath.ToLower().EndsWith(".stl"))
-                    {
-                        meshObject = StlAssetPostProcessor.CreateStlGameObjectRuntime(meshFilePath);
-                    }
-                    else if (meshFilePath.ToLower().EndsWith(".dae"))
-                    {
-                        float globalScale = ColladaAssetPostProcessor.ReadGlobalScale(meshFilePath);
-                        meshObject = MeshImporter.Load(meshFilePath, globalScale, globalScale, globalScale);
-                        if (meshObject != null) 
-                        {
-                            ColladaAssetPostProcessor.ApplyColladaOrientation(meshObject, meshFilePath);
-                        }
-                    }
-                    else if (meshFilePath.ToLower().EndsWith(".obj"))
-                    {
-                        meshObject = MeshImporter.Load(meshFilePath);
-                    }
+                    meshObject = LoadMeshRuntime(meshFilePath);
                 }
                 catch (Exception ex) 
                 {

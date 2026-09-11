@@ -60,6 +60,15 @@ namespace Unity.Robotics.UrdfImporter
                  
                 urdfInertial.useUrdfData = true;
             }
+            else
+            {
+                // Links with no <inertial> are almost always pure coordinate frames -
+                // optical frames, sensor mounts, footprints. Unity would give each of them
+                // the default 1 kg, which on a robot with many such frames adds up to a
+                // large fraction of its real mass and skews a free-floating base.
+                robotLink.mass = minMass;
+                robotLink.centerOfMass = Vector3.zero;
+            }
 
             urdfInertial.displayInertiaGizmo = false;
         }

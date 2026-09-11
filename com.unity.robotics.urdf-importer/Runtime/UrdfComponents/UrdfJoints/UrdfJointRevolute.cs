@@ -95,20 +95,26 @@ namespace Unity.Robotics.UrdfImporter
 #endif
         }
 
+        /// <summary>
+        /// Drives the joint to an absolute angle in radians.
+        /// </summary>
+        protected override void OnSetPosition(float position)
+        {
+#if UNITY_2020_1_OR_NEWER
+            ArticulationDrive drive = unityJoint.xDrive;
+            drive.target = position * Mathf.Rad2Deg;
+            unityJoint.xDrive = drive;
+#else
+            transform.localRotation = Quaternion.AngleAxis(-position * Mathf.Rad2Deg, unityJoint.axis);
+#endif
+        }
+
         #endregion
 
         protected override void ImportJointData(Joint joint)
         {
             AdjustMovement(joint);
             SetDynamics(joint.dynamics);
-
-            mimic = joint.mimic != null;
-            if (mimic)
-            {
-                mimicJointName = joint.mimic.joint;
-                mimicMultiplier = joint.mimic.multiplier;
-                mimicOffset = joint.mimic.offset;
-            }
         }
 
         protected override Joint ExportSpecificJointData(Joint joint)
@@ -159,7 +165,7 @@ namespace Unity.Robotics.UrdfImporter
         /// <param name="joint">Structure containing joint information</param>
         protected override void AdjustMovement(Joint joint)
         {
-            axisofMotion = (joint.axis != null && joint.axis.xyz != null) ? joint.axis.xyz.ToVector3() : new Vector3(1, 0, 0);
+            axisofMotion = ResolveAxis(joint);
             unityJoint.linearLockX = ArticulationDofLock.LimitedMotion;
             unityJoint.linearLockY = ArticulationDofLock.LockedMotion;
             unityJoint.linearLockZ = ArticulationDofLock.LockedMotion;
@@ -170,17 +176,26 @@ namespace Unity.Robotics.UrdfImporter
             Motion.SetFromToRotation(new Vector3(1, 0, 0), -1 * axisofMotionUnity);
             unityJoint.anchorRotation = Motion;
 
+            if (joint.limit == null)
+            {
+                // <limit> is required for a revolute joint. Rather than leave the drive
+                // clamped to [0, 0] - which silently freezes it - fall back to free motion.
+                Debug.LogWarning(
+                    $"Revolute joint '{joint.name}' has no <limit>; importing it with unrestricted rotation.");
+                unityJoint.twistLock = ArticulationDofLock.FreeMotion;
+            }
+
+            ArticulationDrive drive = unityJoint.xDrive;
             if (joint.limit != null)
             {
-                ArticulationDrive drive = unityJoint.xDrive;
-                drive.upperLimit = (float)(joint.limit.upper * Mathf.Rad2Deg);
-                drive.lowerLimit = (float)(joint.limit.lower * Mathf.Rad2Deg);
-                drive.forceLimit = (float)(joint.limit.effort);
-                unityJoint.maxAngularVelocity = (float)(joint.limit.velocity);
-                drive.damping = unityJoint.xDrive.damping;
-                drive.stiffness = unityJoint.xDrive.stiffness;
-                unityJoint.xDrive = drive;
+                drive.upperLimit = ResolveBound(joint.limit.upper, Mathf.PI) * Mathf.Rad2Deg;
+                drive.lowerLimit = ResolveBound(joint.limit.lower, -Mathf.PI) * Mathf.Rad2Deg;
             }
+            drive.forceLimit = ResolveEffort(joint.limit);
+            unityJoint.maxAngularVelocity = ResolveVelocity(joint.limit);
+            drive.damping = unityJoint.xDrive.damping;
+            drive.stiffness = unityJoint.xDrive.stiffness;
+            unityJoint.xDrive = drive;
         }
     }
 }

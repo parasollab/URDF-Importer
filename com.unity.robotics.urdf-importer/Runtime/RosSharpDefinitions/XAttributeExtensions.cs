@@ -34,6 +34,15 @@ namespace Unity.Robotics.UrdfImporter
             return (attribute != null) ? (double)attribute : double.NaN;
         }
 
+        /// <summary>
+        /// Reads an optional attribute, falling back to the value the URDF specification
+        /// defines as its default rather than to NaN.
+        /// </summary>
+        public static double ReadOptionalDouble(this XAttribute attribute, double defaultValue)
+        {
+            return (attribute != null) ? (double)attribute : defaultValue;
+        }
+
         public static string DoubleArrayToString(this IEnumerable<double> arr)
         {
             string arrString = arr.Aggregate("", (current, num) => (current + " " + num));

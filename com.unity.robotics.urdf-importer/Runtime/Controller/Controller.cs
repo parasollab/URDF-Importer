@@ -23,9 +23,18 @@ namespace Unity.Robotics.UrdfImporter.Control
         public int selectedIndex;
 
         public ControlType control = ControlType.PositionControl;
-        public float stiffness;
-        public float damping;
-        public float forceLimit;
+
+        [Tooltip("Drive stiffness applied to every joint. Leave at 0 to keep whatever the " +
+                 "URDF import configured.")]
+        public float stiffness = 10000f;
+
+        [Tooltip("Drive damping applied to every joint. Leave at 0 to keep whatever the " +
+                 "URDF import configured.")]
+        public float damping = 100f;
+
+        [Tooltip("Drive force limit applied to every joint. Leave at 0 to keep the limit " +
+                 "imported from the URDF's <limit effort=...>.")]
+        public float forceLimit = 1000f;
         public float speed = 5f; // Units: degree/s
         public float torque = 100f; // Units: Nm or N
         public float acceleration = 5f;// Units: m/s^2 / degree/s^2
@@ -37,16 +46,28 @@ namespace Unity.Robotics.UrdfImporter.Control
         {
             previousIndex = selectedIndex = 1;
             this.gameObject.AddComponent<FKRobot>();
-            articulationChain = this.GetComponentsInChildren<ArticulationBody>();
+            // The virtual DOFs of a mobile base are driven by UrdfBaseController, not from the
+            // keyboard, and the joint friction below would fight it. Leave them out of the
+            // chain entirely so selection can never land on a body with no JointControl.
+            articulationChain = System.Array.FindAll(
+                this.GetComponentsInChildren<ArticulationBody>(), body => !IsMobileBaseDof(body));
+
             int defDyanmicVal = 10;
             foreach (ArticulationBody joint in articulationChain)
             {
                 joint.gameObject.AddComponent<JointControl>();
                 joint.jointFriction = defDyanmicVal;
                 joint.angularDamping = defDyanmicVal;
-                ArticulationDrive currentDrive = joint.xDrive;
-                currentDrive.forceLimit = forceLimit;
-                joint.xDrive = currentDrive;
+
+                // A zero force limit means the joint cannot move at all. Treat 0 here as
+                // "leave the imported value alone" rather than silently overwriting a limit
+                // the URDF specified.
+                if (forceLimit > 0)
+                {
+                    ArticulationDrive currentDrive = joint.xDrive;
+                    currentDrive.forceLimit = forceLimit;
+                    joint.xDrive = currentDrive;
+                }
             }
             DisplaySelectedJoint(selectedIndex);
             StoreJointColors(selectedIndex);
@@ -232,11 +253,31 @@ namespace Unity.Robotics.UrdfImporter.Control
             joint.controltype = control;
             if (control == ControlType.PositionControl)
             {
+                // Same reasoning as the force limit: a drive with zero stiffness exerts no
+                // force towards its target, so zero means "keep what is already configured".
                 ArticulationDrive drive = joint.joint.xDrive;
-                drive.stiffness = stiffness;
-                drive.damping = damping;
+                if (stiffness > 0)
+                {
+                    drive.stiffness = stiffness;
+                }
+                if (damping > 0)
+                {
+                    drive.damping = damping;
+                }
                 joint.joint.xDrive = drive;
             }
+        }
+
+        /// <summary>
+        /// True for the synthetic x / y / yaw bodies a planar root motion import inserts above
+        /// the robot's base link.
+        /// </summary>
+        static bool IsMobileBaseDof(ArticulationBody body)
+        {
+            UrdfPlanarBase planarBase = body.GetComponentInParent<UrdfPlanarBase>();
+            return planarBase != null &&
+                   (body == planarBase.anchorBody || body == planarBase.forwardBody ||
+                    body == planarBase.lateralBody || body == planarBase.yawBody);
         }
 
         public void OnGUI()

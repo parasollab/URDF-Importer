@@ -108,6 +108,20 @@ namespace Unity.Robotics.UrdfImporter
 #endif
         }
 
+        /// <summary>
+        /// Drives the joint to an absolute displacement in meters.
+        /// </summary>
+        protected override void OnSetPosition(float position)
+        {
+#if UNITY_2020_1_OR_NEWER
+            ArticulationDrive drive = unityJoint.xDrive;
+            drive.target = position;
+            unityJoint.xDrive = drive;
+#else
+            transform.localPosition = unityJoint.axis * position;
+#endif
+        }
+
         #endregion
 
         #region Import
@@ -124,7 +138,7 @@ namespace Unity.Robotics.UrdfImporter
         /// <param name="joint">Structure containing joint information</param>
         protected override void AdjustMovement(Joint joint) // Test this function
         {
-            axisofMotion = (joint.axis != null && joint.axis.xyz != null) ? joint.axis.xyz.ToVector3() : new Vector3(1, 0, 0);
+            axisofMotion = ResolveAxis(joint);
             unityJoint.linearLockX = (joint.limit != null) ? ArticulationDofLock.LimitedMotion : ArticulationDofLock.FreeMotion;
             unityJoint.linearLockY = ArticulationDofLock.LockedMotion;
             unityJoint.linearLockZ = ArticulationDofLock.LockedMotion;
@@ -137,13 +151,13 @@ namespace Unity.Robotics.UrdfImporter
             if (joint.limit != null)
             {
                 ArticulationDrive drive = unityJoint.xDrive;
-                drive.upperLimit = (float)joint.limit.upper;
-                drive.lowerLimit = (float)joint.limit.lower;
-                drive.forceLimit = (float)joint.limit.effort;
+                drive.upperLimit = ResolveBound(joint.limit.upper, UnboundedLinearLimit);
+                drive.lowerLimit = ResolveBound(joint.limit.lower, -UnboundedLinearLimit);
+                drive.forceLimit = ResolveEffort(joint.limit);
 #if UNITY_2020_2_OR_NEWER
-                unityJoint.maxLinearVelocity = (float)joint.limit.velocity;
+                unityJoint.maxLinearVelocity = ResolveVelocity(joint.limit);
 #elif UNITY_2020_1
-                maxLinearVelocity = (float)joint.limit.velocity;
+                maxLinearVelocity = ResolveVelocity(joint.limit);
 #endif
                 unityJoint.xDrive = drive;
             }

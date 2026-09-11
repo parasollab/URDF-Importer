@@ -80,8 +80,9 @@ namespace Unity.Robotics.UrdfImporter
 
             if (!UrdfAssetPathHandler.IsValidAssetPath(im.robot.filename))
             {
-                Debug.LogError("URDF file and resources must be placed in project folder:" +
-                    $"\n{Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length)}");
+                Debug.LogError("The URDF file itself must be placed in the project folder:" +
+                    $"\n{Application.dataPath.Substring(0, Application.dataPath.Length - "Assets".Length)}" +
+                    "\nMeshes it references may live outside the project - those are copied in on import.");
                 if (forceRuntimeMode)
                 { // set runtime mode back to what it was
                     RuntimeUrdf.SetRuntimeMode(im.wasRuntimeMode);
@@ -152,6 +153,8 @@ namespace Unity.Robotics.UrdfImporter
 
             CorrectAxis(im.robotGameObject);
             CreateCollisionExceptions(im.robot, im.robotGameObject);
+            im.robotGameObject.GetComponent<UrdfRobot>().ResolveMimicJoints();
+            ApplyRootMotion(im.robotGameObject, im.settings);
 
             if (im.forceRuntimeMode)
             { // set runtime mode back to what it was
@@ -219,6 +222,68 @@ namespace Unity.Robotics.UrdfImporter
             ImportPipelinePostCreate(im);
 
             return im.robotGameObject;
+        }
+
+        /// <summary>
+        /// Decides how the robot's root link relates to the world. A fixed-base arm is welded
+        /// in place; a mobile base instead gains the three planar DOFs that ROS models as a
+        /// virtual joint between `odom` and `base_link`.
+        /// </summary>
+        static void ApplyRootMotion(GameObject robotGameObject, ImportSettings settings)
+        {
+            Transform baseLink = FindBaseLink(robotGameObject);
+            if (baseLink == null)
+            {
+                return;
+            }
+
+            ArticulationBody rootBody = baseLink.GetComponent<ArticulationBody>();
+
+            switch (settings.rootMotion)
+            {
+                case ImportSettings.rootMotionType.fixedToWorld:
+                    if (rootBody != null)
+                    {
+                        rootBody.immovable = true;
+                    }
+                    break;
+
+                case ImportSettings.rootMotionType.floating:
+                    if (rootBody != null)
+                    {
+                        rootBody.immovable = false;
+                    }
+                    break;
+
+                case ImportSettings.rootMotionType.planar:
+                    UrdfPlanarBase planarBase = UrdfPlanarBase.Create(
+                        robotGameObject.transform, baseLink,
+                        settings.defaultEffortLimit, settings.defaultVelocityLimit);
+
+                    if (planarBase != null)
+                    {
+                        // The root link is no longer the articulation root - the chain's
+                        // anchor is - so it must not be pinned.
+                        if (rootBody != null)
+                        {
+                            rootBody.immovable = false;
+                        }
+                        robotGameObject.AddComponent<Control.UrdfBaseController>();
+                    }
+                    break;
+            }
+        }
+
+        static Transform FindBaseLink(GameObject robotGameObject)
+        {
+            foreach (UrdfLink link in robotGameObject.GetComponentsInChildren<UrdfLink>())
+            {
+                if (link.IsBaseLink)
+                {
+                    return link.transform;
+                }
+            }
+            return null;
         }
 
         public static void CorrectAxis(GameObject robot)

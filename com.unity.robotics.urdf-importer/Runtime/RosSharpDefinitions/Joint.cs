@@ -108,7 +108,7 @@ namespace Unity.Robotics.UrdfImporter
 
             public void WriteToUrdf(XmlWriter writer)
             {
-                if (!(xyz[0] == 0 && xyz[1] == 0 && xyz[2] == 0))
+                if (xyz != null && !(xyz[0] == 0 && xyz[1] == 0 && xyz[2] == 0))
                 {
                     writer.WriteStartElement("axis");
                     writer.WriteAttributeString("xyz", xyz.DoubleArrayToString());
@@ -116,16 +116,30 @@ namespace Unity.Robotics.UrdfImporter
                 }
             }
 
+            /// <summary>
+            /// Index of the dominant component of the axis, or -1 for a null/zero axis.
+            /// Uses magnitude so that a negative axis such as "0 0 -1" resolves to 2
+            /// rather than falling through to -1.
+            /// </summary>
             public int AxisofMotion()
             {
+                if (xyz == null)
+                {
+                    return -1;
+                }
+
+                int dominant = -1;
+                double largest = 0;
                 for (int i = 0; i < 3; i++)
                 {
-                    if (xyz[i] > 0)
+                    double magnitude = System.Math.Abs(xyz[i]);
+                    if (magnitude > largest)
                     {
-                        return i;
+                        largest = magnitude;
+                        dominant = i;
                     }
                 }
-                return -1;
+                return dominant;
             }
         }
 
@@ -206,8 +220,11 @@ namespace Unity.Robotics.UrdfImporter
             {
                 lower = node.Attribute("lower").ReadOptionalDouble(); // optional
                 upper = node.Attribute("upper").ReadOptionalDouble(); // optional
-                effort = (double)node.Attribute("effort"); // required
-                velocity = (double)node.Attribute("velocity"); // required
+                // Required by the URDF spec, but plenty of exporters omit them. Read as
+                // NaN rather than throwing; UrdfJoint.ResolveEffort/ResolveVelocity
+                // substitute the import defaults for NaN, zero and negative values alike.
+                effort = node.Attribute("effort").ReadOptionalDouble();
+                velocity = node.Attribute("velocity").ReadOptionalDouble();
             }
             
             public Limit(double lower, double upper, double effort, double velocity)
@@ -241,11 +258,11 @@ namespace Unity.Robotics.UrdfImporter
             public Mimic(XElement node)
             {
                 joint = (string)node.Attribute("joint"); // required
-                multiplier = node.Attribute("multiplier").ReadOptionalDouble(); // optional
-                offset = node.Attribute("offset").ReadOptionalDouble(); // optional   
+                multiplier = node.Attribute("multiplier").ReadOptionalDouble(1); // optional, spec default 1
+                offset = node.Attribute("offset").ReadOptionalDouble(0); // optional, spec default 0
             }
 
-            public Mimic(string joint, double multiplier = 0, double offset = 0)
+            public Mimic(string joint, double multiplier = 1, double offset = 0)
             {
                 this.joint = joint;
                 this.multiplier = multiplier;
@@ -254,7 +271,7 @@ namespace Unity.Robotics.UrdfImporter
 
             public void WriteToUrdf(XmlWriter writer)
             {
-                if (multiplier == 1 && offset == 0)
+                if (string.IsNullOrEmpty(joint))
                     return;
 
                 writer.WriteStartElement("mimic");

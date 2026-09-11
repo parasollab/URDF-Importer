@@ -14,12 +14,52 @@ limitations under the License.
 
 using System;
 using UnityEngine;
+using UnityMeshImporter;
 
 namespace Unity.Robotics.UrdfImporter
 {
     public class UrdfGeometry
     {
         private const int RoundDigits = 6;
+
+        /// <summary>
+        /// Loads a mesh from disk at runtime. Shared by the visual and collision paths so
+        /// that both accept the same formats - colliders used to handle STL alone, leaving
+        /// any robot described with COLLADA or OBJ meshes with visuals but no collision.
+        /// </summary>
+        /// <param name="meshFilePath">Path already resolved by UrdfAssetPathHandler.</param>
+        public static GameObject LoadMeshRuntime(string meshFilePath)
+        {
+            if (string.IsNullOrEmpty(meshFilePath))
+            {
+                return null;
+            }
+
+            string extension = meshFilePath.ToLowerInvariant();
+
+            if (extension.EndsWith(".stl"))
+            {
+                return StlAssetPostProcessor.CreateStlGameObjectRuntime(meshFilePath);
+            }
+
+            if (extension.EndsWith(".dae"))
+            {
+                float globalScale = ColladaAssetPostProcessor.ReadGlobalScale(meshFilePath);
+                GameObject meshObject = MeshImporter.Load(meshFilePath, globalScale, globalScale, globalScale);
+                if (meshObject != null)
+                {
+                    ColladaAssetPostProcessor.ApplyColladaOrientation(meshObject, meshFilePath);
+                }
+                return meshObject;
+            }
+
+            if (extension.EndsWith(".obj"))
+            {
+                return MeshImporter.Load(meshFilePath);
+            }
+
+            return null;
+        }
 
         public static Link.Geometry ExportGeometryData(GeometryTypes geometryType, Transform transform, bool isCollisionGeometry = false)
         {
